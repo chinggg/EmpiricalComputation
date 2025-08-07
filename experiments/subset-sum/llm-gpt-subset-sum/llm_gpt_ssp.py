@@ -123,12 +123,15 @@ def get_completion_from_messages(messages,
 
 import random
 import ast
+from pathlib import Path
 
 numsets = []
 goalvals = []
 
-# using the generated SSP instances
-with open('output/generated_SSPs.txt', 'r') as file:
+# using the generated SSP instances; resolve relative to this script's directory
+script_dir = Path(__file__).resolve().parent
+ssp_input_path = script_dir / 'output' / 'generated_SSPs.txt'
+with open(ssp_input_path, 'r') as file:
     # Read all lines into a list
     vals = file.read().splitlines()
 

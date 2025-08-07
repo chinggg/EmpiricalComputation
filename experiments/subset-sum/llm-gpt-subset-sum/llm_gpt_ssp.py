@@ -10,7 +10,21 @@
 import os
 import openai
 from dotenv import load_dotenv, find_dotenv
-_ = load_dotenv(find_dotenv()) # read local .env file
+from pathlib import Path
+# Load repo-root .env if present (works from any CWD)
+try:
+    _env_path = None
+    for _p in Path(__file__).resolve().parents:
+        cand = _p / ".env"
+        if cand.exists():
+            _env_path = cand
+            break
+    if _env_path is not None:
+        _ = load_dotenv(_env_path)
+    else:
+        _ = load_dotenv(find_dotenv())
+except Exception:
+    _ = load_dotenv(find_dotenv())
 import time
 import numpy as np
 openai.api_key  = os.environ['OPENAI_API_KEY']

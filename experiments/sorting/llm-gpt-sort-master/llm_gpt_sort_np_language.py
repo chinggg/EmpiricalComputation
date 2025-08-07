@@ -10,11 +10,25 @@ import os
 import openai
 import numpy as np
 from dotenv import load_dotenv, find_dotenv
+from pathlib import Path
 from pycnnum import num2cn
 from num2words import num2words
 import time
 
-_ = load_dotenv(find_dotenv()) # read local .env file
+# Load repo-root .env if present (works from any CWD)
+try:
+    _env_path = None
+    for _p in Path(__file__).resolve().parents:
+        cand = _p / ".env"
+        if cand.exists():
+            _env_path = cand
+            break
+    if _env_path is not None:
+        _ = load_dotenv(_env_path)
+    else:
+        _ = load_dotenv(find_dotenv())
+except Exception:
+    _ = load_dotenv(find_dotenv())
 
 openai.api_key  = os.environ['OPENAI_API_KEY']
 

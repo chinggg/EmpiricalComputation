@@ -53,6 +53,7 @@ def get_completion_from_messages(messages,
 import random
 import ast
 import numpy as np
+import re
 
 # Optional reproducibility
 seed_str = os.getenv("EXPERIMENT_SEED")
@@ -117,7 +118,24 @@ for ubound in range(10,60, 10):
                 end_time = time.time()
                 print(res)
             
-                sorted_list = ast.literal_eval(res)
+                # Strict parse
+                parsed_ok = False
+                try:
+                    sorted_list = ast.literal_eval(res)
+                    parsed_ok = isinstance(sorted_list, list)
+                except Exception:
+                    parsed_ok = False
+                # Optional normalized parse: extract first bracketed list
+                if not parsed_ok and os.getenv("EVAL_NORMALIZE", "false").lower() in ("1", "true", "yes"):
+                    m = re.search(r"\[[\s\S]*\]", res)
+                    if m:
+                        try:
+                            sorted_list = ast.literal_eval(m.group(0))
+                            parsed_ok = isinstance(sorted_list, list)
+                        except Exception:
+                            parsed_ok = False
+                if not parsed_ok:
+                    raise ValueError("Could not parse list response (strict or normalized)")
                 break
             except Exception as ex:
                 print("error: ")

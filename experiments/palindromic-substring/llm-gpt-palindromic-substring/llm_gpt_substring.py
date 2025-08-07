@@ -19,6 +19,7 @@ OUTPUT_ROOT = os.getenv("OUTPUT_ROOT", "output_models")
 EXPERIMENT_TAG = os.getenv("EXPERIMENT_TAG", "palindromic_substring")
 OUTDIR = os.path.join(OUTPUT_ROOT, MODEL_TAG, EXPERIMENT_TAG)
 os.makedirs(OUTDIR, exist_ok=True)
+EVAL_NORMALIZE = os.getenv("EVAL_NORMALIZE", "false").lower() in ("1", "true", "yes")
 
 
 # In[2]:
@@ -92,6 +93,7 @@ import random
 import ast
 import numpy as np
 import string
+import re
 
 
 corrstr = ''
@@ -148,6 +150,15 @@ for ubound in range(1,21, 1):
 
             
                 response = res
+                if EVAL_NORMALIZE:
+                    # Trim surrounding quotes/brackets/whitespace once; keep inner content
+                    tmp = response.strip()
+                    # remove outer quotes or brackets if they wrap the entire string
+                    if (tmp.startswith("[") and tmp.endswith("]")) or (tmp.startswith("(") and tmp.endswith(")")):
+                        tmp = tmp[1:-1].strip()
+                    if (tmp.startswith("'") and tmp.endswith("'")) or (tmp.startswith('"') and tmp.endswith('"')):
+                        tmp = tmp[1:-1]
+                    response = tmp
 
                 break
             except Exception as ex:

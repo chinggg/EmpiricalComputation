@@ -31,3 +31,6 @@ llm-gpt-subset-sum/output/
 
 # Generated graphs
 generating_graphs/*.pdf
+
+# Model-scoped outputs
+output_models/

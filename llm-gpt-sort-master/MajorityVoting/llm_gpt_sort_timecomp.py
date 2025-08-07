@@ -15,12 +15,20 @@ _ = load_dotenv(find_dotenv()) # read local .env file
 import time
 openai.api_key  = os.environ['OPENAI_API_KEY']
 
+# Model and output configuration
+MODEL_NAME = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+MODEL_TAG = os.getenv("OPENAI_MODEL_TAG", MODEL_NAME.replace(":", "_").replace("/", "_"))
+OUTPUT_ROOT = os.getenv("OUTPUT_ROOT", "output_models")
+EXPERIMENT_TAG = os.getenv("EXPERIMENT_TAG", "sort_timecomp")
+OUTDIR = os.path.join(OUTPUT_ROOT, MODEL_TAG, EXPERIMENT_TAG)
+os.makedirs(OUTDIR, exist_ok=True)
+
 
 # In[2]:
 
 
 def get_completion_from_messages(messages, 
-                                 model="gpt-3.5-turbo", 
+                                 model=MODEL_NAME, 
                                  temperature=0, 
                                  max_tokens=1000):
     response = openai.chat.completions.create(
@@ -129,13 +137,13 @@ for ubound in range(105,125, 5):
 
     print(correctness, sampleRuns, correctness/sampleRuns)
 
-with open("output/correctness.txt", 'w+') as f:
+with open(os.path.join(OUTDIR, "correctness.txt"), 'w+') as f:
         f.write(corrstr)
-with open("output/sizes.txt", 'w+') as f:
+with open(os.path.join(OUTDIR, "sizes.txt"), 'w+') as f:
     f.write(sizestr)
-with open("output/maxNum.txt", 'w+') as f:
+with open(os.path.join(OUTDIR, "maxNum.txt"), 'w+') as f:
     f.write(maxnum)
-with open("output/timeComp_API.txt", 'w+') as f:
+with open(os.path.join(OUTDIR, "timeComp_API.txt"), 'w+') as f:
     f.write(timeAPI)
-with open("output/timeCompJ_ALG.txt", 'w+') as f:
+with open(os.path.join(OUTDIR, "timeCompJ_ALG.txt"), 'w+') as f:
     f.write(timeALG)

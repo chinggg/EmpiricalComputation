@@ -1,0 +1,33 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.env
+.env.*
+
+# IDE/Editor
+.vscode/
+.idea/
+
+# Experiment outputs (directories)
+algorithmic_timing_sanCheck/output/
+llm-gpt-palindromic-substring/output/
+llm-gpt-search-master/output/
+llm-gpt-sort-master/output/
+llm-gpt-sort-master/Generate_examples/output/
+llm-gpt-sort-master/MajorityVoting/output/
+llm-gpt-sort-master/sort_unsort_pairs/output/
+llm-gpt-subset-sum/output/
+
+# Generated graphs
+generating_graphs/*.pdf

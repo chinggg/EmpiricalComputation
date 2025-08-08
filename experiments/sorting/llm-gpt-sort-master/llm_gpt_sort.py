@@ -45,8 +45,7 @@ def get_completion_from_messages(messages,
     response = openai.chat.completions.create(
         model=model,
         messages=messages,
-        temperature=temperature, 
-        max_tokens=max_tokens, 
+        temperature=temperature,
     )
     return response.choices[0].message.content
 # def get_completion_from_messages(messages, 
@@ -85,9 +84,20 @@ corrstr = ''
 sizestr = ''
 maxnum = ''
 timestr = ''
-sampleRuns = 100
+sampleRuns = int(os.getenv("SAMPLE_RUNS", "100"))
 
-for ubound in range(10,60, 10):
+# Optional sizes override: comma-separated integers, else default 10..50 step 10
+_sizes_env = os.getenv("SIZES")
+_sizes_list = None
+if _sizes_env:
+    try:
+        _sizes_list = [int(s.strip()) for s in _sizes_env.split(",") if s.strip()]
+    except Exception:
+        _sizes_list = None
+
+size_iter = _sizes_list if _sizes_list else list(range(10, 60, 10))
+
+for ubound in size_iter:
     size = ubound
     correctness = 0
 

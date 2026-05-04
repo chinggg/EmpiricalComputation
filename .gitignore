@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+results/trials/*.jsonl
+results/csv/*.csv
+results/figures/*.pdf
+results/figures/*.png
+!results/trials/.gitkeep
+!results/csv/.gitkeep
+!results/figures/.gitkeep

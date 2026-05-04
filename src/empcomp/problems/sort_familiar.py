@@ -30,18 +30,26 @@ FAMILIAR_SIZES = [10, 20, 30, 40, 50, 100, 150]
 
 
 def make_familiar_problem(generated: dict[int, Sequence[Sequence[int]]]) -> Problem:
-    """Build a Problem whose generator pulls from already-generated lists."""
+    """Build a Problem whose generator pulls from already-generated lists.
+
+    Keys of `generated` are *requested* sizes — what we asked the LLM to
+    produce. Each list in the value is whatever the LLM actually returned,
+    which may be shorter than the requested size (the model undershoots
+    badly above N≈30). We pass the list through as-is; the runner records
+    `actual_size = len(list)` in the trial's `extra` dict so downstream
+    bucketing can use either dimension.
+    """
 
     counters: dict[int, int] = {s: 0 for s in generated}
 
     def gen(_rng: random.Random, size: int):
         pool = generated.get(size, [])
         if not pool:
-            raise RuntimeError(f"no generated lists for size {size}")
+            raise RuntimeError(f"no generated lists for requested size {size}")
         idx = counters[size] % len(pool)
         counters[size] += 1
         items = list(pool[idx])
-        return items, {}
+        return items, {"requested_size": size, "actual_size": len(items)}
 
     def prompt(items, _ctx):
         return SORT_SYSTEM, SORT_USER.format(items=items)

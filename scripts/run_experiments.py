@@ -31,8 +31,23 @@ TRIALS = REPO_ROOT / "results" / "trials"
 CORE = ["sort", "sorted_search", "unsorted_search", "ssp", "substring"]
 
 
-def _generate_familiar_lists(client: LLMClient, sizes: list[int], per_size: int):
-    """Ask the LLM to generate `per_size` lists per size. Cached on disk."""
+def _generate_familiar_lists(
+    client: LLMClient,
+    sizes: list[int],
+    per_size: int,
+    min_returned: int = 2,
+    max_attempts_per_list: int = 3,
+):
+    """Ask the LLM to generate one list per slot. Caches to disk.
+
+    Note: gemma-4-e4b consistently undershoots — asking for 50 yields ~46,
+    asking for 150 yields ~110. We DO NOT discard short lists (the paper
+    explicitly tracks "the size actually returned"). We only retry on:
+      * an exception from the API,
+      * an unparseable response, or
+      * fewer than `min_returned` numbers (degenerate).
+    Anything with len ≥ min_returned is accepted as-is.
+    """
     cache = trial_path(TRIALS, client.model, "sort_familiar", "_genlists")
     cached_by_size: dict[int, list[list[int]]] = {s: [] for s in sizes}
     if cache.exists():
@@ -45,17 +60,32 @@ def _generate_familiar_lists(client: LLMClient, sizes: list[int], per_size: int)
 
     for s in sizes:
         while len(cached_by_size[s]) < per_size:
-            system, user = generate_request(s)
-            try:
-                resp = client.chat(system, user)
-            except Exception as e:
-                print(f"  ! generate failure size={s}: {e}")
-                continue
-            parsed = parse_list(resp.text) or []
-            parsed = [x for x in parsed if isinstance(x, (int, float))][:s]
-            if len(parsed) < s:
-                print(f"  ! short list at size={s}: got {len(parsed)} of {s}")
-                continue
+            attempts = 0
+            parsed: list[int] | None = None
+            resp = None
+            while attempts < max_attempts_per_list:
+                attempts += 1
+                system, user = generate_request(s)
+                try:
+                    resp = client.chat(system, user)
+                except Exception as e:
+                    print(f"  ! generate API failure size={s}: {e}")
+                    continue
+                p = parse_list(resp.text) or []
+                p = [int(x) for x in p if isinstance(x, (int, float))]
+                if len(p) >= min_returned:
+                    parsed = p
+                    break
+                print(f"  ! unparseable / too-short at size={s} (attempt {attempts}, got {len(p)})")
+
+            if parsed is None:
+                # Skip this slot — it would block forever otherwise.
+                print(f"  ! giving up on size={s} after {max_attempts_per_list} attempts")
+                cached_by_size[s].append([])
+                break
+
+            if len(parsed) != s:
+                print(f"  ~ size={s}: model returned {len(parsed)} numbers")
             write_record(
                 cache,
                 {
@@ -66,14 +96,16 @@ def _generate_familiar_lists(client: LLMClient, sizes: list[int], per_size: int)
                     "trial": len(cached_by_size[s]),
                     "seed": 0,
                     "input": None,
-                    "raw_response": resp.text,
+                    "raw_response": resp.text if resp else "",
                     "parsed": parsed,
+                    "actual_size": len(parsed),
                     "correct": True,
-                    "elapsed_s": resp.elapsed_s,
+                    "elapsed_s": resp.elapsed_s if resp else 0.0,
                 },
             )
             cached_by_size[s].append(parsed)
-    return cached_by_size
+    # Drop the empty slots from giving-up so the runner doesn't trip over them.
+    return {s: [lst for lst in lists if lst] for s, lists in cached_by_size.items()}
 
 
 def main() -> None:
@@ -121,8 +153,15 @@ def main() -> None:
         print(f"\n=== sort_familiar (gen) sizes={sizes} ===")
         # Generate enough lists to cover N trials per size.
         generated = _generate_familiar_lists(client, sizes, per_size=args.n)
-        problem = make_familiar_problem(generated)
-        run_problem(problem, client, args.n, TRIALS, seed=args.seed)
+        # Drop any size where generation gave us nothing usable.
+        generated = {s: lists for s, lists in generated.items() if lists}
+        if not generated:
+            print("  no usable generated lists — skipping sort step")
+        else:
+            problem = make_familiar_problem(generated)
+            sort_sizes = list(generated.keys())
+            print(f"=== sort_familiar (sort) sizes={sort_sizes} ===")
+            run_problem(problem, client, args.n, TRIALS, sizes=sort_sizes, seed=args.seed)
 
     print(f"\nDone in {time.perf_counter() - overall_t0:.0f}s")
 

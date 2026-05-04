@@ -49,7 +49,11 @@ def main() -> None:
         for name in ("sort", "sorted_search", "unsorted_search", "ssp", "substring")
     }
 
-    fam = _summary_for(args.model, "sort_familiar", "familiar")
+    # Selfgen panel: bucket by *actual* returned size, since gemma rarely
+    # produces exactly N (paper's footnote: "Number of instances actually
+    # returned with that size").
+    fam_trials = load_trials(trial_path(TRIALS, args.model, "sort_familiar", "familiar"))
+    fam = summarize(fam_trials, size_col="actual_size")
     fig1_path = render_figure1(summaries, fam, FIG_DIR / f"figure1{suffix}.pdf")
     print(f"Figure 1 → {fig1_path}")
 

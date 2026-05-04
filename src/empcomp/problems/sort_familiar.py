@@ -25,8 +25,10 @@ from .base import Problem
 
 # Sizes shown in Table 1 (10..50) plus a few larger sizes like the paper's
 # selfgen panel (which extends to ~200).
-# Table 1 sizes (10..50) plus larger sizes for the selfgen panel.
-FAMILIAR_SIZES = [10, 20, 30, 40, 50, 100, 150]
+# Paper-faithful: Table 1 requests sizes 10..50. Figure 1's "Selfgen Sort"
+# panel's wider x-range comes from the LLM returning lists of *different*
+# lengths than requested — we bucket by actual returned size downstream.
+FAMILIAR_SIZES = [10, 20, 30, 40, 50]
 
 
 def make_familiar_problem(generated: dict[int, Sequence[Sequence[int]]]) -> Problem:

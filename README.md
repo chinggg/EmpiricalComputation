@@ -104,8 +104,8 @@ tok/s, ~10 s/call mean once the model decides to "think"). Measured with
 | ssp              | 2, 5, 8, 11, 14, 17, 20             | 30     | 210   | ~50 m |
 | substring        | 2..20 (19)                          | 30     | 570   | ~3 m  |
 | sort_lang        | 8 sizes × 10 langs                  | 30     | 2 400 | ~5 h  |
-| sort_familiar    | 7 sizes (gen + sort)                | 30     | ~450  | ~50 m |
-| **total**        |                                     |        | ~4 260 | ~8 h |
+| sort_familiar    | 5 sizes (10..50, gen + sort)        | 30     | ~300  | ~25 m |
+| **total**        |                                     |        | ~4 110 | ~7.5 h |
 
 The paper used finer grids (step=5 for sort/search, all 15 lang sizes). Pass
 `--sizes ...` or `--languages ...` to `run_experiments.py` to recover them when

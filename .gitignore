@@ -5,8 +5,11 @@ __pycache__/
 .DS_Store
 results/trials/*.jsonl
 results/csv/*.csv
-results/figures/*.pdf
-results/figures/*.png
+results/figures/*
 !results/trials/.gitkeep
 !results/csv/.gitkeep
 !results/figures/.gitkeep
+results/latency_probe.txt
+
+# Local-only one-shot scripts (temp fixes that shouldn't pollute git history)
+scripts/relabel_trials.py

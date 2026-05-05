@@ -17,7 +17,9 @@ def parse_list(text: str) -> list[Any] | None:
     """Extract a Python list from a model response.
 
     Tries strict literal_eval first, then falls back to the first bracketed
-    region. Returns None on failure.
+    region. Returns None on failure. If the result is a singleton list whose
+    only element is itself a list (e.g. `[[1, 2, 3]]` — a common LLM habit
+    of wrapping the answer in an outer list), the inner list is returned.
     """
     s = text.strip()
     # Strip code fences.
@@ -27,36 +29,50 @@ def parse_list(text: str) -> list[Any] | None:
     # Sanitize "007"-style integers that ast.literal_eval rejects in Python 3.
     s_clean = _LEADING_ZEROS_RE.sub(r"\1", s)
 
+    parsed: list[Any] | None = None
     for candidate in (s_clean, s):
         try:
             v = ast.literal_eval(candidate)
             if isinstance(v, list):
-                return v
+                parsed = v
+                break
         except Exception:
             pass
 
-    m = _LIST_RE.search(s_clean) or _LIST_RE.search(s)
-    if m:
-        try:
-            v = ast.literal_eval(m.group(0))
-            if isinstance(v, list):
-                return v
-        except Exception:
-            pass
-    # Last resort: pull out every integer-looking token in the bracketed region.
-    bracket = _LIST_RE.search(s_clean)
-    if bracket:
-        nums = [int(t) for t in _INT_RE.findall(bracket.group(0))]
-        if nums:
-            return nums
-    # Truncated list (open bracket, no close): grab everything after the first '['.
-    if "[" in s_clean and "]" not in s_clean:
+    if parsed is None:
+        m = _LIST_RE.search(s_clean) or _LIST_RE.search(s)
+        if m:
+            try:
+                v = ast.literal_eval(m.group(0))
+                if isinstance(v, list):
+                    parsed = v
+            except Exception:
+                pass
+
+    if parsed is None:
+        # Last resort: pull out every integer-looking token in the bracketed region.
+        bracket = _LIST_RE.search(s_clean)
+        if bracket:
+            nums = [int(t) for t in _INT_RE.findall(bracket.group(0))]
+            if nums:
+                parsed = nums
+
+    if parsed is None and "[" in s_clean and "]" not in s_clean:
+        # Truncated list (open bracket, no close): grab everything after the first '['.
         tail = s_clean[s_clean.index("[") + 1 :]
         nums = [int(t) for t in _INT_RE.findall(tail)]
         if nums:
             # Drop the last item — likely cut off mid-token.
-            return nums[:-1] if len(nums) > 1 else nums
-    return None
+            parsed = nums[:-1] if len(nums) > 1 else nums
+
+    return _unwrap_singleton(parsed)
+
+
+def _unwrap_singleton(v: list[Any] | None) -> list[Any] | None:
+    """[[1, 2, 3]] -> [1, 2, 3]. Leaves all other shapes alone."""
+    if isinstance(v, list) and len(v) == 1 and isinstance(v[0], list):
+        return v[0]
+    return v
 
 
 def parse_int(text: str) -> int | None:

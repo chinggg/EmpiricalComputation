@@ -32,8 +32,22 @@ newcode/
 
 ```bash
 cd newcode
-uv sync
+uv sync                  # runtime deps
+uv sync --group dev      # + pytest for the test suite
 ```
+
+## Tests
+
+```bash
+uv run pytest                    # full suite (28 unit + 7 live-API)
+uv run pytest tests/test_parsing.py tests/test_problems.py  # unit-only, no LLM
+```
+
+`tests/test_live_api.py` calls the configured LM Studio endpoint with one
+trivial-size instance per problem and asserts correctness end-to-end —
+it is the regression net for naive bugs (parser drops a valid answer,
+checker uses the wrong oracle, etc.). It auto-skips if the endpoint is
+unreachable.
 
 ## Validate plot layout with mock data (no LLM needed)
 

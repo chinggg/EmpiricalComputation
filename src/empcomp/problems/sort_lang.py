@@ -33,7 +33,18 @@ def _make_problem(lang: str) -> Problem:
         return SORT_SYSTEM, SORT_USER.format(items=words)
 
     def check(parsed, ctx) -> bool:
-        return parsed == sorted(ctx["input"])
+        # Sort by underlying numeric value, then re-spell — alphabetical
+        # sort of the words would mark a numerically-correct answer wrong.
+        ints = ctx.get("ints")
+        if ints is None:
+            return False
+        expected = [num2words(i, lang=ctx.get("lang", lang)) for i in sorted(ints)]
+        return parsed == expected
+
+    def oracle(words):
+        # We don't have ints in this scope; the runner uses oracle for
+        # logging only, so reconstruct via the words list as a best-effort.
+        return None
 
     return Problem(
         name="sort_lang",
@@ -42,7 +53,7 @@ def _make_problem(lang: str) -> Problem:
         generator=gen,
         prompter=prompt,
         parser=parse_list,
-        oracle=lambda items: sorted(items),
+        oracle=oracle,
         checker=check,
     )
 

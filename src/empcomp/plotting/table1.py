@@ -1,4 +1,12 @@
-"""Table 1: correctness on Random vs Familiar instances at sizes 10..50."""
+"""Table 1: correctness on Random vs Familiar instances at sizes 10..50.
+
+Both columns are bucketed by the *requested* size. The model's actual
+returned length only differs from the request by a few items (gemma asked
+for 50 returns 46), and those small offsets land in the same bucket
+naturally — so we don't bother with a tolerance window. Each row is the
+mean over N>=30 trials. The paper's parenthesized N count is intentionally
+omitted: with a fixed N per row it carries no information.
+"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,28 +20,19 @@ TABLE1_SIZES = [10, 20, 30, 40, 50]
 def table1_dataframe(
     random_df: pd.DataFrame,
     familiar_df: pd.DataFrame,
-    bucket_width: int = 5,
 ) -> pd.DataFrame:
-    """Build the dataframe shown in Table 1.
-
-    Columns: Array Size, Random, Familiar, Familiar_n.
-    Random is bucketed by `size` (the requested input length, which equals
-    the actual length for `random.sample`). Familiar is bucketed by the
-    *actual* returned length (the paper's "Number of instances actually
-    returned with that size"), within ±bucket_width of the row label —
-    because gemma-4 rarely returns *exactly* 50 numbers when asked for 50.
-    """
     r = _by_size(random_df)
-    f_actual = _familiar_by_actual_size(familiar_df)
+    f = _by_size(familiar_df)
     rows = []
     for s in TABLE1_SIZES:
-        rand_mean, _ = r.get(s, (None, 0))
-        fam_mean, fam_n = _bucket(f_actual, s, bucket_width)
+        rand_mean, rand_n = r.get(s, (None, 0))
+        fam_mean, fam_n = f.get(s, (None, 0))
         rows.append(
             {
                 "Array Size": s,
                 "Random": _fmt(rand_mean),
                 "Familiar": _fmt(fam_mean),
+                "Random_n": rand_n,
                 "Familiar_n": fam_n,
             }
         )
@@ -42,14 +41,7 @@ def table1_dataframe(
 
 def render_table1(df: pd.DataFrame, out_path: Path) -> Path:
     out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Render exactly as in the paper: "0.70 (161)" in the Familiar column.
-    paper = df.copy()
-    paper["Familiar"] = [
-        f"{v} ({n})" if v != "—" else "—"
-        for v, n in zip(paper["Familiar"], paper["Familiar_n"])
-    ]
-    paper = paper[["Array Size", "Random", "Familiar"]]
+    paper = df[["Array Size", "Random", "Familiar"]]
 
     md_lines = [
         "| " + " | ".join(paper.columns) + " |",
@@ -62,7 +54,7 @@ def render_table1(df: pd.DataFrame, out_path: Path) -> Path:
     if out_path.suffix == ".md":
         out_path.write_text(md, encoding="utf-8")
     else:
-        # Save both: csv next to the chosen path, plus a printable .md.
+        # Save the full df (with N columns for QA) to CSV, plus a printable .md.
         df.to_csv(out_path, index=False)
         out_path.with_suffix(".md").write_text(md, encoding="utf-8")
     return out_path
@@ -77,39 +69,6 @@ def _by_size(df: pd.DataFrame) -> dict[int, tuple[float, int]]:
     for size, sub in df.groupby("size"):
         out[int(size)] = (sub["correct"].mean(), int(len(sub)))
     return out
-
-
-def _familiar_by_actual_size(df: pd.DataFrame) -> pd.DataFrame:
-    """Return per-trial dataframe of (actual_size, correct) for familiar trials.
-
-    Falls back to the requested `size` if `actual_size` isn't recorded.
-    """
-    if df.empty:
-        return pd.DataFrame(columns=["actual_size", "correct"])
-    df = df.copy()
-    df["correct"] = df["correct"].astype(bool).astype(int)
-    if "extra" in df.columns:
-        df["actual_size"] = df["extra"].apply(
-            lambda e: (e or {}).get("actual_size") if isinstance(e, dict) else None
-        )
-    if "actual_size" not in df.columns or df["actual_size"].isna().all():
-        df["actual_size"] = df["size"]
-    df["actual_size"] = df["actual_size"].fillna(df["size"]).astype(int)
-    return df[["actual_size", "correct"]]
-
-
-def _bucket(
-    df: pd.DataFrame, center: int, half_width: int
-) -> tuple[float | None, int]:
-    if df.empty:
-        return (None, 0)
-    sub = df[
-        (df["actual_size"] >= center - half_width)
-        & (df["actual_size"] <= center + half_width)
-    ]
-    if sub.empty:
-        return (None, 0)
-    return (float(sub["correct"].mean()), int(len(sub)))
 
 
 def _fmt(v: float | None) -> str:

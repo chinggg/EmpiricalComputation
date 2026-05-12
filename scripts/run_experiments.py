@@ -1,10 +1,9 @@
 """Drive the full experiment suite.
 
 Usage examples:
-  uv run python scripts/run_experiments.py --problems sort --n 30
+  uv run python scripts/run_experiments.py --problems sort --preset default --n 30
+  uv run python scripts/run_experiments.py --all --preset thinking --sizes-preset quick --n 10
   uv run python scripts/run_experiments.py --all --n 30
-
-The runner is resumable: re-running picks up from the last completed trial.
 """
 from __future__ import annotations
 
@@ -12,7 +11,8 @@ import argparse
 import time
 from pathlib import Path
 
-from empcomp.llm import LLMClient
+from empcomp.llm import make_client
+from empcomp.presets import PRESETS, get_preset, get_sizes
 from empcomp import problems
 from empcomp.problems.sort_lang import sort_lang_problems
 from empcomp.problems.sort_familiar import (
@@ -32,7 +32,7 @@ CORE = ["sort", "sorted_search", "unsorted_search", "ssp", "substring"]
 
 
 def _generate_familiar_lists(
-    client: LLMClient,
+    client,
     sizes: list[int],
     per_size: int,
     min_returned: int = 2,
@@ -40,15 +40,10 @@ def _generate_familiar_lists(
 ):
     """Ask the LLM to generate one list per slot. Caches to disk.
 
-    Note: gemma-4-e4b consistently undershoots — asking for 50 yields ~46,
-    asking for 150 yields ~110. We DO NOT discard short lists (the paper
-    explicitly tracks "the size actually returned"). We only retry on:
-      * an exception from the API,
-      * an unparseable response, or
-      * fewer than `min_returned` numbers (degenerate).
-    Anything with len ≥ min_returned is accepted as-is.
+    Accepts lists with len >= min_returned (model may undershoot the requested
+    size). Only retries on API error, unparseable response, or degenerate output.
     """
-    cache = trial_path(TRIALS, client.model, "sort_familiar", "_genlists")
+    cache = trial_path(TRIALS, client.model, client.preset.name, "sort_familiar", "_genlists")
     cached_by_size: dict[int, list[list[int]]] = {s: [] for s in sizes}
     if cache.exists():
         from empcomp.storage import read_records
@@ -79,7 +74,6 @@ def _generate_familiar_lists(
                 print(f"  ! unparseable / too-short at size={s} (attempt {attempts}, got {len(p)})")
 
             if parsed is None:
-                # Skip this slot — it would block forever otherwise.
                 print(f"  ! giving up on size={s} after {max_attempts_per_list} attempts")
                 cached_by_size[s].append([])
                 break
@@ -92,6 +86,7 @@ def _generate_familiar_lists(
                     "problem": "sort_familiar",
                     "variant": "_genlists",
                     "model": client.model,
+                    "preset": client.preset.name,
                     "size": s,
                     "trial": len(cached_by_size[s]),
                     "seed": 0,
@@ -104,18 +99,31 @@ def _generate_familiar_lists(
                 },
             )
             cached_by_size[s].append(parsed)
-    # Drop the empty slots from giving-up so the runner doesn't trip over them.
     return {s: [lst for lst in lists if lst] for s, lists in cached_by_size.items()}
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=30, help="repeats per size")
-    ap.add_argument("--problems", nargs="+", default=None,
-                    help="subset of: " + ", ".join(CORE + ["sort_lang", "sort_familiar"]))
+    ap.add_argument(
+        "--preset",
+        choices=list(PRESETS),
+        default="default",
+        help="experiment preset: default | thinking | deterministic",
+    )
+    ap.add_argument(
+        "--sizes-preset",
+        choices=["quick", "full"],
+        default="full",
+        help="quick = small subset for fast runs; full = all problem sizes",
+    )
+    ap.add_argument(
+        "--problems", nargs="+", default=None,
+        help="subset of: " + ", ".join(CORE + ["sort_lang", "sort_familiar"]),
+    )
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--sizes", nargs="+", type=int, default=None,
-                    help="override sizes (applies to selected core problems)")
+                    help="explicit size override (ignores --sizes-preset for selected problems)")
     ap.add_argument("--languages", nargs="+", default=None,
                     help="subset of language codes (sort_lang only)")
     ap.add_argument("--familiar-sizes", nargs="+", type=int, default=None)
@@ -126,15 +134,21 @@ def main() -> None:
     if not selected:
         ap.error("specify --all or --problems")
 
-    client = LLMClient()
-    print(f"# model={client.model} base_url={client.base_url} n={args.n}")
+    preset = get_preset(args.preset)
+    client = make_client(preset)
+    print(f"# model={client.model}  preset={preset.name}  "
+          f"temperature={preset.temperature}  thinking={preset.thinking}")
+    print(f"# base_url={client.base_url}  n={args.n}  sizes={args.sizes_preset}")
     overall_t0 = time.perf_counter()
 
     for name in CORE:
         if name not in selected:
             continue
         problem = problems.get(name)
-        sizes = args.sizes if args.sizes else problem.sizes
+        if args.sizes:
+            sizes = args.sizes
+        else:
+            sizes = get_sizes(args.sizes_preset, name, problem.sizes)
         print(f"\n=== {name} sizes={sizes} ===")
         run_problem(problem, client, args.n, TRIALS, sizes=sizes, seed=args.seed)
 
@@ -146,14 +160,16 @@ def main() -> None:
             if lang not in langs:
                 continue
             print(f"--- {p.variant} ---")
-            run_problem(p, client, args.n, TRIALS, seed=args.seed)
+            lang_sizes = get_sizes(args.sizes_preset, "sort_lang", p.sizes)
+            run_problem(p, client, args.n, TRIALS, sizes=lang_sizes, seed=args.seed)
 
     if "sort_familiar" in selected:
-        sizes = args.familiar_sizes or FAMILIAR_SIZES
+        if args.familiar_sizes:
+            sizes = args.familiar_sizes
+        else:
+            sizes = get_sizes(args.sizes_preset, "sort_familiar", FAMILIAR_SIZES)
         print(f"\n=== sort_familiar (gen) sizes={sizes} ===")
-        # Generate enough lists to cover N trials per size.
         generated = _generate_familiar_lists(client, sizes, per_size=args.n)
-        # Drop any size where generation gave us nothing usable.
         generated = {s: lists for s, lists in generated.items() if lists}
         if not generated:
             print("  no usable generated lists — skipping sort step")

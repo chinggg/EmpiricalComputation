@@ -34,26 +34,28 @@ def parse_list(text: str) -> list[Any] | None:
         try:
             v = ast.literal_eval(candidate)
             if isinstance(v, list):
-                parsed = v
+                parsed = [item for item in v if item is not Ellipsis]
                 break
         except Exception:
             pass
 
     if parsed is None:
-        m = _LIST_RE.search(s_clean) or _LIST_RE.search(s)
-        if m:
+        matches = _LIST_RE.findall(s_clean) or _LIST_RE.findall(s)
+        for m in reversed(matches):
             try:
-                v = ast.literal_eval(m.group(0))
+                v = ast.literal_eval(m)
                 if isinstance(v, list):
-                    parsed = v
+                    parsed = [item for item in v if item is not Ellipsis]
+                    break
             except Exception:
-                pass
+                continue
 
     if parsed is None:
-        # Last resort: pull out every integer-looking token in the bracketed region.
-        bracket = _LIST_RE.search(s_clean)
-        if bracket:
-            nums = [int(t) for t in _INT_RE.findall(bracket.group(0))]
+        # Last resort: pull out every integer-looking token in the last bracketed region.
+        matches = _LIST_RE.findall(s_clean)
+        if matches:
+            bracket = matches[-1]
+            nums = [int(t) for t in _INT_RE.findall(bracket)]
             if nums:
                 parsed = nums
 

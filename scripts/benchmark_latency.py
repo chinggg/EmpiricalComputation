@@ -6,14 +6,15 @@ to choose final size grids for `run_experiments.py`.
 from __future__ import annotations
 
 import argparse
+import random
 import statistics
 import time
 from pathlib import Path
 
-from empcomp.llm import LLMClient
+from empcomp.llm import make_client
+from empcomp.presets import get_preset
 from empcomp import problems
 from empcomp.problems.sort_lang import sort_lang_problems
-import random
 
 
 PROBES: list[tuple[str, list[int]]] = [
@@ -26,7 +27,7 @@ PROBES: list[tuple[str, list[int]]] = [
 LANG_PROBES = [(lang, [5, 15, 30]) for lang in ("en", "de", "ko")]
 
 
-def probe(client: LLMClient, problem, size: int, n: int) -> list[float]:
+def probe(client, problem, size: int, n: int) -> list[float]:
     rng = random.Random(f"42|{problem.name}|{problem.variant}|{size}")
     times = []
     for i in range(n):
@@ -45,15 +46,21 @@ def probe(client: LLMClient, problem, size: int, n: int) -> list[float]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=3, help="probes per (problem, size)")
+    ap.add_argument("--preset", default="default",
+                    help="preset to use for probing (default|thinking|deterministic)")
     ap.add_argument("--out", type=Path,
                     default=Path(__file__).resolve().parents[1]
                     / "results" / "latency_probe.txt")
     args = ap.parse_args()
 
-    client = LLMClient()
-    print(f"model={client.model} base_url={client.base_url}")
+    preset = get_preset(args.preset)
+    client = make_client(preset)
+    print(f"model={client.model}  preset={preset.name}  base_url={client.base_url}")
 
-    lines = [f"# benchmark — model={client.model}, base_url={client.base_url}", ""]
+    lines = [
+        f"# benchmark — model={client.model}  preset={preset.name}  base_url={client.base_url}",
+        "",
+    ]
     total_t = 0.0
     total_calls = 0
     for name, sizes in PROBES:

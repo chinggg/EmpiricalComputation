@@ -24,23 +24,27 @@ COLUMNS = [
 
 
 def render_figure1(
-    summaries: dict[str, pd.DataFrame],
-    selfgen: pd.DataFrame | None,
+    summaries_map: dict[str, dict[str, pd.DataFrame]],
+    selfgen_map: dict[str, pd.DataFrame],
     out_path: Path,
+    log_scale: bool = False,
 ) -> Path:
-    """`summaries` keys are problem names (sort, sorted_search, ...).
-    `selfgen` is the per-size correctness for the familiar-sort variant.
+    """`summaries_map` is {preset_name: {problem_name: summary_df}}.
+    `selfgen_map` is {preset_name: selfgen_df}.
     """
-    fig, axes = plt.subplots(4, 5, figsize=(16, 11))
+    fig, axes = plt.subplots(3, 5, figsize=(16, 9))
+
+    presets = sorted(summaries_map.keys())
 
     for col, (key, title) in enumerate(COLUMNS):
-        df = summaries.get(key, pd.DataFrame())
         ax_t, ax_c, ax_f = axes[0, col], axes[1, col], axes[2, col]
 
-        if not df.empty:
-            ax_t.plot(df["size"], df["mean_time"], "o-", markersize=4)
-            ax_c.plot(df["size"], df["mean_correctness"], "o-", markersize=4)
-            ax_f.plot(df["size"], df["time_to_first"], "o-", markersize=4)
+        for preset in presets:
+            df = summaries_map[preset].get(key, pd.DataFrame())
+            if not df.empty:
+                ax_t.plot(df["size"], df["mean_time"], "o-", markersize=4, label=preset)
+                ax_c.plot(df["size"], df["mean_correctness"], "o-", markersize=4, label=preset)
+                ax_f.plot(df["size"], df["time_to_first"], "o-", markersize=4, label=preset)
 
         ax_t.set_title(title)
         for ax, ylabel in (
@@ -50,18 +54,18 @@ def render_figure1(
         ):
             ax.set_xlabel("Size")
             ax.set_ylabel(ylabel)
-        ax_c.set_ylim(0.0, 1.0)
+            ax.grid(True, alpha=0.3)
+            
+            if log_scale and ax in (ax_t, ax_f):
+                ax.set_yscale("log")
 
-    # Selfgen panel: bottom-left, others hidden.
-    sg_ax = axes[3, 0]
-    for col in range(1, 5):
-        axes[3, col].axis("off")
-    if selfgen is not None and not selfgen.empty:
-        sg_ax.plot(selfgen["size"], selfgen["mean_correctness"], "-", linewidth=1)
-    sg_ax.set_xlabel("Size")
-    sg_ax.set_ylabel("Selfgen Sort\nAverage Correctness")
-    sg_ax.set_ylim(0.0, 1.0)
-    sg_ax.grid(True, alpha=0.3)
+        ax_c.set_ylim(-0.05, 1.05)
+
+    if len(presets) > 1:
+        # Put legend in the bottom-right axis to keep it "inside" the layout
+        handles, labels = axes[0, 0].get_legend_handles_labels()
+        if handles:
+            axes[2, 4].legend(handles, labels, loc="lower right", title="Presets", frameon=True)
 
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)

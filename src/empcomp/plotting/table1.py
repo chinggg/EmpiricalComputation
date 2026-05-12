@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 
 
-TABLE1_SIZES = [10, 20, 30, 40, 50]
+TABLE1_SIZES = [10, 25, 50, 75, 100]
 
 
 def table1_dataframe(

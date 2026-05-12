@@ -19,6 +19,7 @@ from empcomp.storage import trial_path, write_record
 
 
 MOCK_MODEL = "mock"
+MOCK_PRESET = "default"
 N = 30
 RESULTS = Path(__file__).resolve().parents[1] / "results" / "trials"
 
@@ -48,22 +49,28 @@ HALFLIVES = {
 }
 
 
-def fabricate(rng: random.Random, problem, n: int, lang_offset: float = 0.0) -> None:
-    out = trial_path(RESULTS, MOCK_MODEL, problem.name, problem.variant)
+def fabricate(rng: random.Random, problem, n: int, preset: str, lang_offset: float = 0.0) -> None:
+    out = trial_path(RESULTS, MOCK_MODEL, preset, problem.name, problem.variant)
     if out.exists():
         out.unlink()
     name = problem.name
-    half = HALFLIVES.get(name, 30.0) + lang_offset
+    # Variation between presets: 'thinking' is slightly better, 'deterministic' is baseline.
+    preset_bonus = {"thinking": 5.0, "default": 0.0, "deterministic": -5.0}.get(preset, 0.0)
+    half = HALFLIVES.get(name, 30.0) + lang_offset + preset_bonus
+    
     for size in problem.sizes:
         p_correct = sigmoid_correctness(size, half)
         for i in range(n):
             t_mean = time_for(name, size)
+            if preset == "thinking":
+                t_mean *= 1.5 # thinking takes longer
             elapsed = max(0.05, rng.gauss(t_mean, t_mean * 0.15))
             correct = rng.random() < p_correct
             record = {
                 "problem": name,
                 "variant": problem.variant,
                 "model": MOCK_MODEL,
+                "preset": preset,
                 "size": size,
                 "trial": i,
                 "seed": 0,
@@ -73,8 +80,11 @@ def fabricate(rng: random.Random, problem, n: int, lang_offset: float = 0.0) -> 
                 "parsed": "[mocked]" if correct else None,
                 "correct": correct,
                 "elapsed_s": elapsed,
-                "tokens_in": None,
-                "tokens_out": None,
+                "input_tokens": None,
+                "total_output_tokens": None,
+                "reasoning_output_tokens": 100 if preset == "thinking" else 0,
+                "tokens_per_second": None,
+                "time_to_first_token_seconds": None,
                 "error": None,
             }
             write_record(out, record)
@@ -97,52 +107,60 @@ LANG_OFFSETS = {
 
 def main() -> None:
     rng = random.Random(7)
+    presets = ["default", "thinking", "deterministic"]
 
-    # Core problems for Figure 1.
-    for name in ("sort", "sorted_search", "unsorted_search", "ssp", "substring"):
-        fabricate(rng, problems.get(name), N)
+    for preset in presets:
+        print(f"Generating mock data for preset: {preset}")
+        for name in ("sort", "sorted_search", "unsorted_search", "ssp", "substring"):
+            fabricate(rng, problems.get(name), N, preset)
 
-    # Multilingual sort for Figure 2 — one Problem per language.
-    for p in sort_lang_problems:
-        lang = p.variant.split("=")[1]
-        fabricate(rng, p, N, lang_offset=LANG_OFFSETS.get(lang, -3.0))
+        for p in sort_lang_problems:
+            lang = p.variant.split("=")[1]
+            fabricate(rng, p, N, preset, lang_offset=LANG_OFFSETS.get(lang, -3.0))
 
-    # Familiar sort for Table 1 + selfgen panel.
-    sizes = [10, 20, 30, 40, 50, 100, 150, 200]
-    fake_lists = {s: [[0] * s] * N for s in sizes}
-    fam = make_familiar_problem(fake_lists)
-    # The default registry version has empty pools so trials would fail; build a
-    # parallel mock with the right size grid.
-    out_fam = trial_path(RESULTS, MOCK_MODEL, fam.name, fam.variant)
-    if out_fam.exists():
-        out_fam.unlink()
-    rng2 = random.Random(11)
-    # Familiar should be more correct at mid sizes than random sort.
-    for s in sizes:
-        # Random baseline correctness vs familiar follows paper Table 1 values.
-        p_familiar = {10: 1.00, 20: 1.00, 30: 0.95, 40: 0.67,
-                      50: 0.70, 100: 0.40, 150: 0.10, 200: 0.02}.get(s, 0.5)
-        for i in range(N):
-            elapsed = 0.4 + 0.025 * s + rng2.gauss(0, 0.1)
-            correct = rng2.random() < p_familiar
-            record = {
-                "problem": fam.name,
-                "variant": fam.variant,
-                "model": MOCK_MODEL,
-                "size": s,
-                "trial": i,
-                "seed": 0,
-                "input": None,
-                "extra": {},
-                "raw_response": "[mocked]",
-                "parsed": "[mocked]" if correct else None,
-                "correct": correct,
-                "elapsed_s": max(0.1, elapsed),
-                "tokens_in": None,
-                "tokens_out": None,
-                "error": None,
-            }
-            write_record(out_fam, record)
+        sizes = [10, 20, 30, 40, 50, 100, 150, 200]
+        fake_lists = {s: [[0] * s] * N for s in sizes}
+        fam = make_familiar_problem(fake_lists)
+        out_fam = trial_path(RESULTS, MOCK_MODEL, preset, fam.name, fam.variant)
+        if out_fam.exists():
+            out_fam.unlink()
+        rng2 = random.Random(11)
+        # Variation for familiar sort
+        bonus = {"thinking": 10, "default": 0, "deterministic": -10}.get(preset, 0)
+        for s in sizes:
+            base_p = {10: 1.00, 20: 1.00, 30: 0.95, 40: 0.67,
+                          50: 0.70, 100: 0.40, 150: 0.10, 200: 0.02}.get(s, 0.5)
+            # crude way to shift probability
+            p_familiar = max(0.0, min(1.0, base_p + bonus / 100.0))
+            
+            for i in range(N):
+                t_mean = 0.4 + 0.025 * s
+                if preset == "thinking":
+                    t_mean *= 1.5
+                elapsed = t_mean + rng2.gauss(0, 0.1)
+                correct = rng2.random() < p_familiar
+                record = {
+                    "problem": fam.name,
+                    "variant": fam.variant,
+                    "model": MOCK_MODEL,
+                    "preset": preset,
+                    "size": s,
+                    "trial": i,
+                    "seed": 0,
+                    "input": None,
+                    "extra": {},
+                    "raw_response": "[mocked]",
+                    "parsed": "[mocked]" if correct else None,
+                    "correct": correct,
+                    "elapsed_s": max(0.1, elapsed),
+                    "input_tokens": None,
+                    "total_output_tokens": None,
+                    "reasoning_output_tokens": 100 if preset == "thinking" else 0,
+                    "tokens_per_second": None,
+                    "time_to_first_token_seconds": None,
+                    "error": None,
+                }
+                write_record(out_fam, record)
     print(f"Wrote mock trials to {RESULTS}/")
 
 

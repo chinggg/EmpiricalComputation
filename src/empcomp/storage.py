@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-def trial_path(root: Path, model: str, problem: str, variant: str) -> Path:
+def trial_path(root: Path, model: str, preset: str, problem: str, variant: str) -> Path:
     safe_variant = variant.replace("/", "_")
-    return root / f"{model}__{problem}__{safe_variant}.jsonl"
+    return root / f"{model}__{preset}" / f"{problem}__{safe_variant}.jsonl"
 
 
 def write_record(path: Path, record: dict[str, Any]) -> None:
@@ -34,13 +34,15 @@ def read_records(path: Path) -> Iterator[dict[str, Any]]:
                 continue
 
 
-def count_done(path: Path, size: int) -> int:
-    """How many trials at this size are already recorded — for resuming a run."""
-    return sum(1 for r in read_records(path) if r.get("size") == size)
+def done_trial_ids(path: Path, size: int) -> set[int]:
+    """Return set of trial IDs that already have a valid (non-null parsed) result."""
+    return {r["trial"] for r in read_records(path) if r.get("size") == size and r.get("parsed") is not None}
 
 
 def _default(o: Any):
     # Catch numpy scalars and similar without taking on numpy as a dep here.
     if hasattr(o, "item"):
         return o.item()
+    if isinstance(o, type(Ellipsis)):
+        return "..."
     raise TypeError(f"not serializable: {type(o).__name__}")

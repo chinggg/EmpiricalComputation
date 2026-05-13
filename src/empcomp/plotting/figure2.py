@@ -34,7 +34,7 @@ def render_figure2(
     ax.set_title("Average Correctness by Size for Each Language", fontweight="bold")
     ax.set_ylim(0.0, 1.0)
     ax.grid(True, alpha=0.5)
-    ax.legend(title="Languages", loc="upper right")
+    ax.legend(title="Languages", loc="lower left")
 
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)

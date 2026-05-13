@@ -15,9 +15,8 @@ from typing import Any, Sequence
 
 from ..parsing import parse_list
 from ..prompts import (
-    GENERATE_NUMS_SYSTEM,
+    SYSTEM_PROMPT,
     GENERATE_NUMS_USER,
-    SORT_SYSTEM,
     SORT_USER,
 )
 from .base import Problem
@@ -25,10 +24,7 @@ from .base import Problem
 
 # Sizes shown in Table 1 (10..50) plus a few larger sizes like the paper's
 # selfgen panel (which extends to ~200).
-# Paper-faithful: Table 1 requests sizes 10..50. Figure 1's "Selfgen Sort"
-# panel's wider x-range comes from the LLM returning lists of *different*
-# lengths than requested — we bucket by actual returned size downstream.
-FAMILIAR_SIZES = [10, 20, 30, 40, 50]
+FAMILIAR_SIZES = [10, 25, 50, 75, 100]
 
 
 def make_familiar_problem(generated: dict[int, Sequence[Sequence[int]]]) -> Problem:
@@ -54,7 +50,7 @@ def make_familiar_problem(generated: dict[int, Sequence[Sequence[int]]]) -> Prob
         return items, {"requested_size": size, "actual_size": len(items)}
 
     def prompt(items, _ctx):
-        return SORT_SYSTEM, SORT_USER.format(items=items)
+        return SYSTEM_PROMPT, SORT_USER.format(items=items)
 
     def check(parsed, ctx) -> bool:
         return parsed == sorted(ctx["input"])
@@ -74,7 +70,7 @@ def make_familiar_problem(generated: dict[int, Sequence[Sequence[int]]]) -> Prob
 
 def generate_request(size: int) -> tuple[str, str]:
     """The system+user prompt asking the LLM to produce a random list of `size`."""
-    return GENERATE_NUMS_SYSTEM.format(n=size), GENERATE_NUMS_USER.format(
+    return SYSTEM_PROMPT, GENERATE_NUMS_USER.format(
         n=size, max_value=999
     )
 

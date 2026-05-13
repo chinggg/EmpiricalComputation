@@ -5,12 +5,11 @@ import random
 import string
 
 from ..parsing import parse_substring
-from ..prompts import SUBSTRING_SYSTEM, SUBSTRING_USER
+from ..prompts import SYSTEM_PROMPT, SUBSTRING_USER
 from .base import Problem
 
 
-# Substring is fast (single-token-ish output); keep the full paper grid.
-SUBSTRING_SIZES = list(range(2, 21))
+SUBSTRING_SIZES = list(range(2, 92, 3))  # [2, 5, ..., 89] — step=3, 30 points
 
 
 def _generate(rng: random.Random, size: int):
@@ -19,7 +18,7 @@ def _generate(rng: random.Random, size: int):
 
 
 def _prompt(text, _ctx):
-    return SUBSTRING_SYSTEM, SUBSTRING_USER.format(text=text)
+    return SYSTEM_PROMPT, SUBSTRING_USER.format(text=text)
 
 
 def _longest_palindrome_len(s: str) -> int:

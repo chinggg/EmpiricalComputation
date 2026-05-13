@@ -1,59 +1,36 @@
 """Prompt templates. Centralized so prompt-engineering variants are a one-file change."""
 
-# Wording is preserved from the original LLM-GPT-Sort tooling so results are
-# directly comparable to the paper.
-
-SORT_SYSTEM = (
-    "Response should only contain the sorted data in the direction specified by the user. "
-    "Do not say anything else, just return a structure with the sorted information. "
-    "You role is to only return the data."
-)
-SORT_USER = (
-    "Sort the elements in the given collection in the Ascending order, and return only "
-    "the sorted collection in the list format:\n{items}"
+# Centralized System Prompt for all tasks
+# Incorporating the formal definition of an Empirical Computer.
+SYSTEM_PROMPT = (
+    "You are an empirical computer who can solve computational problems without programming. "
+    "Your will be given a natural language description of a computational problem. "
+    "Please only return a single result in one-shot manner without any other text."
 )
 
-SEARCH_SYSTEM = (
-    "Response should only contain the data specified by the user. "
-    "Do not say anything else, just return the correct index as an integer. "
-    "You role is to only return the number."
-)
-SORTED_SEARCH_USER = (
-    "Given a sorted list of numbers {items}, return the zero-based index of the number "
-    "{target} in the list or -1 if the number isn't in the list."
-)
-UNSORTED_SEARCH_USER = (
-    "Given a list of numbers {items}, return the zero-based index of the number {target} "
-    "in the list or -1 if the number isn't in the list."
+# --- Task-specific User Prompts ---
+
+SORT_USER = "Sort the following items in ascending order and return the list: {items}"
+
+SEARCH_SORTED_USER = (
+    "In the sorted list {items}, find the zero-based index of {target}. "
+    "Return the index as an integer, or -1 if not found."
 )
 
-SSP_SYSTEM = (
-    "Response should only contain the data specified by the user obtained by solving the "
-    "subset sum problem. Do not say anything else, just return a list with the answer "
-    "information. You role is to only return the data. Make sure the answer is correct."
+SEARCH_UNSORTED_USER = (
+    "In the list {items}, find the zero-based index of {target}. "
+    "Return the index as an integer, or -1 if not found."
 )
+
 SSP_USER = (
-    "According to the subset sum NP problem, return the elements that sum to {goal} from "
-    "the set {items} and return only the answer in the list format. "
-    "Think step by step. Double check the answer."
+    "Find a subset of multiset of integers {items} that sums to exactly {goal}. "
+    "A solution is guaranteed to exist. If multiple subsets exist, return any one of them. "
+    "Return the result as a list."
 )
 
-SUBSTRING_SYSTEM = (
-    "Response should only contain the data specified by the user. Do not say anything else, "
-    "just return the answer. You role is to only return the answer."
-)
 SUBSTRING_USER = (
-    "Given the string [{text}], return the longest palindrome substring of the string "
-    "without brackets. The substring must be a palindrome."
+    "Return the longest palindrome substring of the string [{text}] without brackets. "
+    "A solution is guaranteed to exist. If multiple palindromes have the same maximum length, return any one of them."
 )
 
-GENERATE_NUMS_SYSTEM = (
-    "Response should only contain the data in the range specified by the user. "
-    "Do not say anything else, just return a list with the randomly generated {n} numbers "
-    "data and nothing else. Do not use ellipses."
-)
-GENERATE_NUMS_USER = (
-    "Randomly generate {n} numbers in the range 0 to {max_value}, and return only the "
-    "collection in the list format. Make sure to generate exactly {n} numbers. "
-    "I found you tend to generate fewer than requested so please generate more."
-)
+GENERATE_NUMS_USER = "Generate {n} random numbers between 0 and {max_value} as a list."

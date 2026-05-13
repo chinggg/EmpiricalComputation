@@ -4,13 +4,11 @@ from __future__ import annotations
 import random
 
 from ..parsing import parse_list
-from ..prompts import SORT_SYSTEM, SORT_USER
+from ..prompts import SYSTEM_PROMPT, SORT_USER
 from .base import Problem
 
 
-# Trimmed for the 4B-model 8h budget; sizes 10/20/30/40/50 are kept so the
-# same trials feed Table 1's Random column. Override via `--sizes`.
-SORT_SIZES = [10, 20, 30, 40, 50, 75, 100, 125, 150]
+SORT_SIZES = list(range(5, 155, 5))  # [5, 10, 15, ..., 150] — step=5, 30 points
 
 
 def _generate(rng: random.Random, size: int):
@@ -19,7 +17,7 @@ def _generate(rng: random.Random, size: int):
 
 
 def _prompt(items, _ctx) -> tuple[str, str]:
-    return SORT_SYSTEM, SORT_USER.format(items=items)
+    return SYSTEM_PROMPT, SORT_USER.format(items=items)
 
 
 def _check(parsed, ctx) -> bool:

@@ -13,7 +13,7 @@ from typing import Iterable
 from num2words import num2words
 
 from ..parsing import parse_list
-from ..prompts import SORT_SYSTEM, SORT_USER
+from ..prompts import SYSTEM_PROMPT, SORT_USER
 from .base import Problem
 
 
@@ -30,7 +30,7 @@ def _make_problem(lang: str) -> Problem:
         return words, {"ints": ints, "lang": lang}
 
     def prompt(words, _ctx):
-        return SORT_SYSTEM, SORT_USER.format(items=words)
+        return SYSTEM_PROMPT, SORT_USER.format(items=words)
 
     def check(parsed, ctx) -> bool:
         # Sort by underlying numeric value, then re-spell — alphabetical

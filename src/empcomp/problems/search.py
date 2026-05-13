@@ -4,11 +4,11 @@ from __future__ import annotations
 import random
 
 from ..parsing import parse_int
-from ..prompts import SEARCH_SYSTEM, SORTED_SEARCH_USER, UNSORTED_SEARCH_USER
+from ..prompts import SYSTEM_PROMPT, SEARCH_SORTED_USER, SEARCH_UNSORTED_USER
 from .base import Problem
 
 
-SEARCH_SIZES = [10, 25, 50, 75, 100, 125, 150]
+SEARCH_SIZES = list(range(5, 155, 5)) + list(range(160, 201, 10))  # [5..150 step 5] + [160..200 step 10]
 
 
 def _generate_unsorted(rng: random.Random, size: int):
@@ -24,11 +24,11 @@ def _generate_sorted(rng: random.Random, size: int):
 
 
 def _prompt_sorted(items, ctx):
-    return SEARCH_SYSTEM, SORTED_SEARCH_USER.format(items=items, target=ctx["target"])
+    return SYSTEM_PROMPT, SEARCH_SORTED_USER.format(items=items, target=ctx["target"])
 
 
 def _prompt_unsorted(items, ctx):
-    return SEARCH_SYSTEM, UNSORTED_SEARCH_USER.format(items=items, target=ctx["target"])
+    return SYSTEM_PROMPT, SEARCH_UNSORTED_USER.format(items=items, target=ctx["target"])
 
 
 def _check(parsed, ctx) -> bool:

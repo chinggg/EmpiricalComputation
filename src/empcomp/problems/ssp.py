@@ -11,11 +11,11 @@ import random
 from collections import Counter
 
 from ..parsing import parse_list
-from ..prompts import SSP_SYSTEM, SSP_USER
+from ..prompts import SYSTEM_PROMPT, SSP_USER
 from .base import Problem
 
 
-SSP_SIZES = [2, 5, 8, 11, 14, 17, 20]
+SSP_SIZES = list(range(2, 32)) + list(range(33, 53, 2))  # [2..31 step 1] + [33..51 step 2]
 
 
 def _generate(rng: random.Random, size: int):
@@ -27,7 +27,7 @@ def _generate(rng: random.Random, size: int):
 
 
 def _prompt(items, ctx):
-    return SSP_SYSTEM, SSP_USER.format(items=items, goal=ctx["goal"])
+    return SYSTEM_PROMPT, SSP_USER.format(items=items, goal=ctx["goal"])
 
 
 def _check(parsed, ctx) -> bool:

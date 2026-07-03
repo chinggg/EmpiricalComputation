@@ -1,7 +1,7 @@
 [project]
 name = "empcomp"
 version = "0.1.0"
-description = "Empirical Computation: clean re-implementation"
+description = "Official replication package and artifact for paper 'Empirical Computation: Prompting versus Programming'"
 requires-python = ">=3.10"
 dependencies = [
     "openai>=1.50",

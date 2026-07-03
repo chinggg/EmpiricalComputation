@@ -1,16 +1,27 @@
-# Empirical Computation — clean re-implementation
+# [ASE '26 NIER] Artifact of "Empirical Computation: Prompting versus Programming"
 
-Re-implements the experiments from *Empirical Computation: Prompting versus
-Programming* in a way that is small, resumable, and easy to extend with new
-problems, models, or prompts. Drop-in target: a single overnight run on a
-local LLM (e.g. Gemma 4 via LM Studio) producing Figures 1–2 and Table 1
-identical in layout to the paper.
+This repository contains the official replication package and artifact for our paper:
+
+**Empirical Computation: Prompting versus Programming** [[PDF]](https://mboehme.github.io/paper/ASE26-empirical.pdf)
+
+```bibtex
+@inproceedings{ASE26-empirical,
+  author       = {Tang, Eric and Liu, Jing and B{\"o}hme, Marcel},
+  booktitle    = {Proceedings of the 41st IEEE/ACM International Conference on Automated Software Engineering (NIER track)},
+  numpages     = {5},
+  series       = {ASE'26 (NIER)},
+  title        = {Empirical Computation: Prompting versus Programming},
+  year         = {2026},
+}
+```
+
+It provides the complete implementation to reproduce the experiments, extend them with new models/problems/prompts, and regenerate the tables and figures shown in the paper. The actual results of our experiments are compressed in `results.7z`.
 
 ## Layout
 
 ```
-newcode/
 ├── pyproject.toml           uv-managed
+├── results.7z               Compressed experimental trials and data from the paper
 ├── src/empcomp/
 │   ├── llm.py               LM Studio native client + OpenAI-compat fallback
 │   ├── presets.py           named experiment presets (default / thinking / deterministic)
@@ -26,13 +37,12 @@ newcode/
 │   ├── benchmark_latency.py probe model timing for sizing the run budget
 │   ├── run_experiments.py   drive the full suite (resumable)
 │   └── plot_all.py          render all figures from JSONL
-└── results/{trials,csv,figures}/
+└── results/{trials,csv,figures}/ Empty placeholders (populate via results.7z or new runs)
 ```
 
 ## Setup
 
 ```bash
-cd newcode
 uv sync                  # runtime deps
 uv sync --group dev      # + pytest for the test suite
 ```
@@ -55,7 +65,7 @@ in `thinking_text` and `reasoning_output_tokens`.
 ## Tests
 
 ```bash
-uv run pytest                    # full suite (39 unit + 14 live-API)
+uv run pytest                    # full suite (39 unit + 18 live-API)
 uv run pytest tests/test_parsing.py tests/test_presets.py tests/test_problems.py  # unit-only, no LLM
 uv run pytest tests/test_live_api.py -v -s  # live tests (prints model name)
 ```
@@ -143,30 +153,10 @@ the `thinking` preset. `error` is non-null when the LLM call itself failed.
 |---|---|
 | A new model | set `EMPCOMP_MODEL` / `EMPCOMP_BASE_URL` env vars |
 | A new prompt phrasing | edit `src/empcomp/prompts.py` |
-| A new computational problem | add a `Problem` in `src/empcomp/problems/` and register |
-| A new language for sort_lang | add the code to `LANGUAGES` in `sort_lang.py` |
-| A new metric | extend `aggregate.summarize` |
-| A new plot | drop a module under `plotting/` |
+| A new computational problem | add a `Problem` subclass in `src/empcomp/problems/` and register it |
+| A new language for sort_lang | add the language code to `LANGUAGES` in `src/empcomp/problems/sort_lang.py` |
+| A new metric | extend `summarize` in `src/empcomp/aggregate.py` |
+| A new plot | drop a module under `src/empcomp/plotting/` |
 
-These hooks are the points the rejection reviews repeatedly asked for: model
-swap, prompt-engineering variants (CoT, etc.), problem-set extension beyond toy
-algorithms, and instance-encoding variation. The code does not implement any of
-those new variants — it just doesn't fight you when you want to add them.
+These extension points make this replication package highly flexible and extensible. Researchers can easily swap models, test different prompt-engineering variants (such as CoT), extend the problem set, or vary instance encodings.
 
-## Sizing the overnight run
-
-Measured with `benchmark_latency.py --n 2` on Gemma-4-26B-A4B (~60 tok/s,
-LM Studio, `default` preset, reasoning off).
-
-| Problem          | Default sizes                      | Trials | Calls | Est.   |
-|------------------|------------------------------------|-------:|------:|-------:|
-| sort             | 5, 10, 15, …, 150 (step=5, 30 pts) | 30     | 900   | ~100 m |
-| sorted_search    | 5, 10, 15, …, 150 (step=5, 30 pts) | 30     | 900   | ~13 m  |
-| unsorted_search  | 5, 10, 15, …, 150 (step=5, 30 pts) | 30     | 900   | ~13 m  |
-| ssp              | 2, 4, …, 60 (step=2, 30 pts)       | 30     | 900   | ~21 m  |
-| substring        | 2, 5, …, 89 (step=3, 30 pts)       | 30     | 900   | ~5 m   |
-| sort_lang        | 8 sizes × 10 langs                 | 30     | 2 400 | ~75 m  |
-| sort_familiar    | 10, 25, 50, 75, 100 (gen + sort)   | 30     | ~300  | ~23 m  |
-| **total**        |                                    |        | ~7 170 | ~4 h   |
-
-The paper used more sizes to as we found reasoning LLM is really capable of solving these problems when size is small. The runner is resumable so partial overnight runs aren't lost.
